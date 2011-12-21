@@ -357,7 +357,7 @@ class MemCache
   def set(key, value, expiry = 0, raw = false)
     raise MemCacheError, "Update of readonly cache" if @readonly
 
-    value = Marshal.dump value unless raw
+    value = Base64.encode64(Marshal.dump(value)) unless raw
     with_server(key) do |server, cache_key|
       logger.debug { "set #{key} to #{server.inspect}: #{value.to_s.size}" } if logger
 
@@ -405,7 +405,7 @@ class MemCache
     (value, token) = gets(key, raw)
     return nil unless value
     updated = yield value
-    value = raw ? updated : Marshal.dump(updated)
+    value = raw ? updated : Base64.encode64(Marshal.dump(updated))
 
     with_server(key) do |server, cache_key|
       logger.debug { "cas #{key} to #{server.inspect}: #{value.to_s.size}" } if logger
@@ -437,7 +437,7 @@ class MemCache
 
   def add(key, value, expiry = 0, raw = false)
     raise MemCacheError, "Update of readonly cache" if @readonly
-    value = Marshal.dump value unless raw
+    value = Base64.encode64(Marshal.dump(value)) unless raw
     with_server(key) do |server, cache_key|
       logger.debug { "add #{key} to #{server}: #{value ? value.to_s.size : 'nil'}" } if logger
       command = "add #{cache_key} 0 #{expiry} #{value.to_s.size}#{noreply}\r\n#{value}\r\n"
@@ -458,7 +458,7 @@ class MemCache
   # If +raw+ is true, +value+ will not be Marshalled.
   def replace(key, value, expiry = 0, raw = false)
     raise MemCacheError, "Update of readonly cache" if @readonly
-    value = Marshal.dump value unless raw
+    value = Base64.encode64(Marshal.dump(value)) unless raw
     with_server(key) do |server, cache_key|
       logger.debug { "replace #{key} to #{server}: #{value ? value.to_s.size : 'nil'}" } if logger
       command = "replace #{cache_key} 0 #{expiry} #{value.to_s.size}#{noreply}\r\n#{value}\r\n"
@@ -1129,6 +1129,7 @@ class MemCache
       @status = sprintf "%s:%s DEAD (%s), will retry at %s", @host, @port, reason, @retry
       @logger.info { @status } if @logger
     end
+
 
   end
 
