@@ -247,7 +247,7 @@ class MemCache
       logger.debug { "get #{key} from #{server.inspect}" } if logger
       value = cache_get server, cache_key
       return nil if value.nil?
-      value = Marshal.load value unless raw
+      value = adaptive_unmarshal value unless raw
       return value
     end
   rescue TypeError => err
@@ -318,7 +318,7 @@ class MemCache
       begin
         values = cache_get_multi server, keys_for_server_str
         values.each do |key, value|
-          results[cache_keys[key]] = raw ? value : Marshal.load(value)
+          results[cache_keys[key]] = raw ? value : adaptive_unmarshal(value)
         end
       rescue IndexError => e
         # Ignore this server and try the others
@@ -662,6 +662,20 @@ class MemCache
 
   protected unless $TESTING
 
+  def adaptive_unmarshal(data)
+    Marshal.load(
+      # Look at the first two bytes to see if it's been base64-encoded
+      case [data[0], data[1]]
+      when [4,8]
+        data
+      when [66,65]
+        Base64.decode64(data)
+      else
+        throw "Unrecognized data format pulled from memcache: " + data
+      end
+    )
+  end
+
   ##
   # Create a key for the cache, incorporating the namespace qualifier if
   # requested.
@@ -784,7 +798,7 @@ class MemCache
         socket.gets   # "END\r\n"
         [value, $2]
       end
-      result[0] = Marshal.load result[0] unless raw
+      result[0] = adaptive_unmarshal result[0] unless raw
       result
     end
   rescue TypeError => err
